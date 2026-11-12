@@ -116,16 +116,16 @@ export default function LibrarySection({
 
   return (
     <div className="space-y-6">
-      <section className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6">
+      <section className="rounded-2xl border border-[#292929] bg-[#141414] p-6">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
           <div>
-            <h2 className="text-base font-semibold text-zinc-100 flex items-center gap-2">
+            <h2 className="text-base font-semibold text-[#F5F5F0] flex items-center gap-2">
               Clip Library
-              <span className="rounded-full bg-amber-400/15 px-2.5 py-0.5 text-xs text-amber-300 font-mono">
+              <span className="rounded-full bg-[#FFC800]/15 px-2.5 py-0.5 text-xs text-[#FFC800] font-mono">
                 {clips.length} clip{clips.length === 1 ? "" : "s"}
               </span>
             </h2>
-            <p className="text-xs text-zinc-400 mt-0.5">
+            <p className="text-xs text-[#929292] mt-0.5">
               Your best footage, in one place. When you recreate a reel, the AI picks clips from
               here, writes captions, and cuts to the trend&apos;s pacing.
             </p>
@@ -143,7 +143,7 @@ export default function LibrarySection({
               <button
                 type="button"
                 onClick={onGoRecreate}
-                className="rounded-full bg-amber-500/90 px-4 py-1.5 text-xs font-semibold text-black hover:bg-amber-400 transition-colors"
+                className="rounded-full bg-[#FFC800] px-4 py-1.5 text-xs font-semibold text-black hover:bg-[#D99A00] transition-colors"
               >
                 Recreate a Reel →
               </button>
@@ -164,10 +164,10 @@ export default function LibrarySection({
               void handleFiles(e.dataTransfer.files);
             }}
             className={`rounded-2xl border-2 border-dashed px-4 py-8 text-center transition-all ${
-              dragOver ? "border-amber-400/80 bg-amber-400/10" : "border-zinc-700 bg-zinc-950/40"
+              dragOver ? "border-[#FFC800]/80 bg-[#FFC800]/10" : "border-[#292929] bg-[#101010]"
             }`}
           >
-            <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-zinc-800 text-amber-400 text-lg mb-2">
+            <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-zinc-800 text-[#FFC800] text-lg mb-2">
               🎞️
             </div>
             <p className="text-sm font-medium text-zinc-100">Drop clips to add to library</p>
@@ -190,7 +190,7 @@ export default function LibrarySection({
             />
           </div>
 
-          <div className="rounded-2xl border border-zinc-800 bg-zinc-950/40 p-4 flex flex-col justify-center gap-2">
+          <div className="rounded-2xl border border-[#292929] bg-[#101010] p-4 flex flex-col justify-center gap-2">
             <label className="text-xs font-medium text-zinc-300">
               Tags for new clips{" "}
               <span className="font-normal text-zinc-500">(comma separated)</span>
@@ -200,19 +200,19 @@ export default function LibrarySection({
               value={tagsText}
               onChange={(e) => setTagsText(e.target.value)}
               placeholder="travel, drone, b-roll, city night…"
-              className="w-full rounded-full border border-zinc-700 bg-zinc-900 px-4 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-amber-500/60 focus:outline-none"
+              className="w-full rounded-full border border-[#292929] bg-zinc-900 px-4 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-[#FFC800]/60 focus:outline-none"
             />
             <p className="text-[11px] text-zinc-500">
               Tags help the AI match the right clip to each shot.
             </p>
             {uploading && (
               <div className="mt-1 space-y-1.5">
-                <p className="text-xs text-amber-300 animate-pulse truncate">
+                <p className="text-xs text-[#FFC800] animate-pulse truncate">
                   Uploading {uploadName}…
                 </p>
                 <div className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-800">
                   <div
-                    className="h-full bg-amber-400 transition-all duration-300"
+                    className="h-full bg-[#FFC800] transition-all duration-300"
                     style={{ width: `${Math.max(4, uploadPct)}%` }}
                   />
                 </div>
@@ -223,7 +223,7 @@ export default function LibrarySection({
         </div>
 
         {clips.length === 0 ? (
-          <div className="rounded-xl border border-zinc-800 bg-zinc-950/30 px-4 py-10 text-center">
+          <div className="rounded-xl border border-[#292929] bg-[#101010] px-4 py-10 text-center">
             <p className="text-sm text-zinc-400">No clips yet.</p>
             <p className="text-xs text-zinc-600 mt-1">
               Add your best footage above — the AI will pull from it when recreating reels.
@@ -231,10 +231,10 @@ export default function LibrarySection({
           </div>
         ) : (
           <>
-            <div className="flex items-center justify-between border-b border-zinc-800 pb-2 mb-3">
+            <div className="flex items-center justify-between border-b border-[#292929] pb-2 mb-3">
               <p className="text-xs text-zinc-400">
                 {selectedCount > 0 ? (
-                  <span className="text-amber-300 font-medium">
+                  <span className="text-[#FFC800] font-medium">
                     {selectedCount} selected for recreation
                   </span>
                 ) : (
@@ -260,8 +260,8 @@ export default function LibrarySection({
                     key={clip.id}
                     className={`group relative overflow-hidden rounded-xl border transition-colors ${
                       isSelected
-                        ? "border-amber-500/60 bg-zinc-950/80"
-                        : "border-zinc-800 bg-zinc-950/40 hover:border-zinc-700"
+                        ? "border-[#FFC800]/80 bg-[#161616]"
+                        : "border-[#292929] bg-[#101010] hover:border-zinc-700"
                     }`}
                   >
                     <button
@@ -286,7 +286,7 @@ export default function LibrarySection({
                         <span
                           className={`absolute top-1.5 left-1.5 flex h-5 w-5 items-center justify-center rounded-full border text-[11px] ${
                             isSelected
-                              ? "border-amber-400 bg-amber-400 text-black"
+                              ? "border-[#FFC800] bg-[#FFC800] text-black"
                               : "border-zinc-500 bg-black/50 text-transparent"
                           }`}
                         >
@@ -333,7 +333,7 @@ export default function LibrarySection({
           <button
             type="button"
             onClick={onGoRecreate}
-            className="rounded-full bg-amber-500 px-7 py-2.5 text-sm font-semibold text-black hover:bg-amber-400 shadow-md transition-all"
+            className="rounded-full bg-[#FFC800] px-7 py-2.5 text-sm font-semibold text-black hover:bg-[#D99A00] shadow-md transition-all"
           >
             Recreate a Reel with {selectedCount} clip{selectedCount === 1 ? "" : "s"} →
           </button>

@@ -13,8 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "FrameMuse — AI Cinematic Reel Studio",
-  description: "Turn long videos into stories worth watching.",
+  title: "cuadros — One studio. Every video workflow.",
+  description:
+    "cuadros is an AI-powered video creation and editing studio where creators can generate videos from ideas, edit their own footage, recreate reference-video editing styles and produce publish-ready content.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

@@ -15,7 +15,7 @@ function resolveStorageRoot(): string {
       const pkg = JSON.parse(readFileSync(path.join(dir, "package.json"), "utf8")) as {
         name?: string;
       };
-      if (pkg.name === "framemuse") return path.join(dir, "storage");
+      if (pkg.name === "cuadros" || pkg.name === "framemuse") return path.join(dir, "storage");
     } catch {
       /* keep walking up */
     }

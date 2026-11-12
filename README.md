@@ -1,15 +1,29 @@
-# FrameMuse
+# cuadros
 
-AI-assisted cinematic video repurposing & reel recreation studio that transforms footage into vertical 9:16 stories with beat-synced edits and inspired audio.
+> **One studio. Every video workflow.**  
+> Website: [cuadros.ai](https://cuadros.ai)
 
-## Features
+cuadros is an AI-powered video creation and editing studio where creators can generate videos from ideas, edit their own footage, recreate reference-video editing styles, and produce publish-ready cinematic content.
 
-- **Timeline Studio**: Visual timeline editor with scrubbable playhead, draggable range selection, split/trim controls, and thumbnail previews.
-- **Inspired Reel Matcher**: Recreate 30–40s vertical reels by matching cut pacing, rhythm, and soundtrack from an inspiration video.
-- **Multi-Clip & Link Ingestion**: Batch upload local video files or paste video URLs with multi-clip combination.
-- **Soundtrack & Synchronized Lyrics**: Search music via YouTube/yt-dlp, sync lyrics via lrclib, trim song parts, and mix/replace audio.
-- **Fast Media Pipeline**: Hardware-accelerated video scaling, reframing (9:16 vertical, 16:9 horizontal, letterbox fit), and high-quality rendering via FFmpeg.
-- **Captions & Recreate Engine**: Caption generation and stylistic recreation workflows.
+---
+
+## 4 Core Workflows
+
+1. **Edit My Footage**: Upload multiple clips or import video links, analyze moments and dialogue, trim on a precision timeline, reframe to vertical 9:16, add synced music, and export.
+2. **Generate a Video**: Transform prompts and scripts into video scenes with custom visual styles, AI narration, and ambient audio.
+3. **Recreate a Reference Video**: Analyze the editing style, cut pacing, zoom rhythm, captions, and soundtrack of any inspiration video, then map your footage onto that creative blueprint.
+4. **Create Using Both**: Seamlessly combine your original footage, AI-generated scenes, and reference-inspired pacing within a unified project workspace.
+
+---
+
+## Architecture & Principles
+
+- **Frontend**: Next.js (App Router), React 19, TypeScript, Tailwind CSS with cuadros cinematic palette (`#080808` background, `#FFC800` primary accent, `#191919` surface, `#292929` borders).
+- **Processing**: Local deterministic FFmpeg / FFprobe media pipelines with Apple Silicon hardware acceleration (`h264_videotoolbox`), background job queues, and atomic JSON persistence.
+- **Intelligence**: Multimodal model adapters (OpenAI / Gemini) with graceful heuristic fallbacks for offline editing.
+- **Audio & Subtitles**: YouTube & `yt-dlp` track search, synced lyrics via `lrclib`, beat detection, and burnt-in/SRT caption generation.
+
+---
 
 ## Getting Started
 
@@ -26,4 +40,4 @@ npm install
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) to start creating reels.
+Open [http://localhost:3000](http://localhost:3000) to open the cuadros studio.

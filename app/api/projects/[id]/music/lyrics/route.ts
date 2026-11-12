@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { loadProject, saveProject } from "@/lib/store";
 import type { LyricLine } from "@/lib/types";
 
-const LRCLIB_AGENT = "FrameMuse/1.0 (reel editor; contact: local)";
+const LRCLIB_AGENT = "cuadros/1.0 (cuadros.ai; video studio)";
 const MIN_LINES = 4;
 const DURATION_MATCH_TOLERANCE = 5;
 const EXACT_DURATION_TOLERANCE = 10;

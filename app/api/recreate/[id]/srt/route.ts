@@ -17,7 +17,7 @@ export async function GET(
       status: 200,
       headers: {
         "Content-Type": "text/plain; charset=utf-8",
-        "Content-Disposition": 'attachment; filename="framemuse-reel.srt"',
+        "Content-Disposition": 'attachment; filename="cuadros-reel.srt"',
         "Cache-Control": "private, max-age=3600",
       },
     });

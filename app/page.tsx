@@ -75,7 +75,7 @@ function defaultRanges(d: number): RangeRow[] {
 }
 
 function draftKey(id: string): string {
-  return `framemuse:draft:${id}`;
+  return `cuadros:draft:${id}`;
 }
 
 type Draft = {
@@ -90,7 +90,7 @@ type Draft = {
 
 function loadDraft(id: string): Draft | null {
   try {
-    const raw = localStorage.getItem(draftKey(id));
+    const raw = localStorage.getItem(draftKey(id)) || localStorage.getItem(`framemuse:draft:${id}`);
     if (!raw) return null;
     const d = JSON.parse(raw) as Partial<Draft>;
     if (!d || !Array.isArray(d.ranges)) return null;
@@ -189,7 +189,11 @@ export default function StudioPage() {
   const [bulkMore, setBulkMore] = useState(0);
   const [playhead, setPlayhead] = useState(0);
   const [sel, setSel] = useState<{ start: number; end: number } | null>(null);
-  const [homeView, setHomeView] = useState<"studio" | "library" | "recreate">("studio");
+  const [homeView, setHomeView] = useState<"studio" | "library" | "recreate" | "templates">("studio");
+  const [newProjectModalOpen, setNewProjectModalOpen] = useState(false);
+  const [generateModalOpen, setGenerateModalOpen] = useState(false);
+  const [promptText, setPromptText] = useState("");
+  const [promptStyle, setPromptStyle] = useState("cinematic-warm");
   const [libraryClips, setLibraryClips] = useState<LibraryClip[]>([]);
   const [librarySelected, setLibrarySelected] = useState<ReadonlySet<string>>(new Set());
   const [libraryLoaded, setLibraryLoaded] = useState(false);
@@ -220,18 +224,18 @@ export default function StudioPage() {
   useEffect(() => {
     Promise.resolve().then(() => {
       try {
-        const saved = sessionStorage.getItem("fm:view");
-        if (saved === "library" || saved === "recreate") setHomeView(saved);
+        const saved = sessionStorage.getItem("cuadros:view") || sessionStorage.getItem("fm:view");
+        if (saved === "library" || saved === "recreate" || saved === "templates") setHomeView(saved);
       } catch {
         /* storage unavailable */
       }
     });
   }, []);
 
-  const setView = (v: "studio" | "library" | "recreate") => {
+  const setView = (v: "studio" | "library" | "recreate" | "templates") => {
     setHomeView(v);
     try {
-      sessionStorage.setItem("fm:view", v);
+      sessionStorage.setItem("cuadros:view", v);
     } catch {
       /* storage unavailable */
     }
@@ -1126,7 +1130,7 @@ export default function StudioPage() {
     if (!project || !job.outputFile) return;
     const a = document.createElement("a");
     a.href = `/api/projects/${project.id}/exports/${job.outputFile}`;
-    a.download = `framemuse-reel-${job.id.slice(0, 8)}-${job.format ?? "vertical"}.mp4`;
+    a.download = `cuadros-reel-${job.id.slice(0, 8)}-${job.format ?? "vertical"}.mp4`;
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -1146,31 +1150,41 @@ export default function StudioPage() {
   const displayJob = selectedExport ?? activeJob ?? latestDone;
 
   return (
-    <div className="min-h-screen bg-[#0b0b0d] text-zinc-100">
-      <header className="border-b border-zinc-800/80 px-6 py-4 flex items-center justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-lg font-semibold tracking-tight">
-            Frame<span className="text-amber-400/90">Muse</span>
-          </h1>
-          <p className="text-xs text-zinc-500">Turn long videos into stories worth watching.</p>
+    <div className="min-h-screen bg-[#080808] text-[#F5F5F0]">
+      <header className="border-b border-[#292929] bg-[#080808]/90 backdrop-blur-md px-6 py-3.5 sticky top-0 z-40 flex items-center justify-between gap-4 flex-wrap">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 cursor-pointer" onClick={() => setView("studio")}>
+            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#FFC800] text-black font-black text-sm tracking-tighter shadow-md">
+              c
+            </span>
+            <span className="text-lg font-bold tracking-tight text-[#F5F5F0] lowercase">
+              cuadros<span className="text-[#FFC800]">.</span>
+            </span>
+          </div>
+          <span className="hidden sm:inline-block h-3.5 w-px bg-[#292929]" />
+          <p className="hidden md:inline text-xs text-[#929292]">
+            One studio. Every video workflow.
+          </p>
         </div>
+
         {!project && (
-          <nav className="flex rounded-full border border-zinc-700 p-0.5 bg-zinc-950/60">
+          <nav className="flex rounded-full border border-[#292929] p-0.5 bg-[#191919]">
             {(
               [
                 { key: "studio", label: "🎬 Studio" },
-                { key: "library", label: `🎞️ Library${libraryClips.length > 0 ? ` (${libraryClips.length})` : ""}` },
                 { key: "recreate", label: "✨ Recreate" },
+                { key: "library", label: `🎞️ Library${libraryClips.length > 0 ? ` (${libraryClips.length})` : ""}` },
+                { key: "templates", label: "⚡ Templates" },
               ] as const
             ).map((tab) => (
               <button
                 key={tab.key}
                 type="button"
                 onClick={() => setView(tab.key)}
-                className={`rounded-full px-4 py-1.5 text-xs font-medium transition-colors ${
+                className={`rounded-full px-4 py-1.5 text-xs font-medium transition-all ${
                   homeView === tab.key
-                    ? "bg-amber-500 text-black shadow-sm"
-                    : "text-zinc-400 hover:text-zinc-200"
+                    ? "bg-[#FFC800] text-black shadow-sm font-semibold"
+                    : "text-[#929292] hover:text-[#F5F5F0]"
                 }`}
               >
                 {tab.label}
@@ -1178,17 +1192,260 @@ export default function StudioPage() {
             ))}
           </nav>
         )}
-        {tools?.ffmpeg === false && (
-          <p className="text-xs text-red-400 max-w-xs text-right">
-            FFmpeg not found. Install with <code className="bg-zinc-800 px-1 rounded">brew install ffmpeg</code>.
-          </p>
-        )}
-        {tools?.ytDlp === false && (
-          <p className="text-xs text-amber-400 max-w-xs text-right">
-            Link import unavailable. Install with <code className="bg-zinc-800 px-1 rounded">brew install yt-dlp</code>.
-          </p>
-        )}
+
+        <div className="flex items-center gap-3">
+          {!project && (
+            <button
+              type="button"
+              onClick={() => setNewProjectModalOpen(true)}
+              className="rounded-full bg-[#FFC800] px-4 py-1.5 text-xs font-semibold text-black hover:bg-[#D99A00] transition-colors shadow-sm flex items-center gap-1.5"
+            >
+              <span>+</span>
+              <span>New Project</span>
+            </button>
+          )}
+          {tools?.ffmpeg === false && (
+            <p className="text-xs text-red-400 max-w-xs text-right">
+              FFmpeg not found. Install with <code className="bg-[#191919] px-1 rounded">brew install ffmpeg</code>.
+            </p>
+          )}
+          {tools?.ytDlp === false && (
+            <p className="text-xs text-amber-400 max-w-xs text-right">
+              Link import unavailable. Install with <code className="bg-[#191919] px-1 rounded">brew install yt-dlp</code>.
+            </p>
+          )}
+        </div>
       </header>
+
+      {/* New Project Modal with 4 Creation Workflows */}
+      {newProjectModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="w-full max-w-2xl rounded-2xl border border-[#292929] bg-[#191919] p-6 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-[#292929] pb-4">
+              <div>
+                <h3 className="text-lg font-bold text-[#F5F5F0] flex items-center gap-2">
+                  <span>Start a New Project</span>
+                  <span className="text-[10px] font-semibold text-[#FFC800] bg-[#FFC800]/10 px-2 py-0.5 rounded-full border border-[#FFC800]/20 lowercase">
+                    cuadros studio
+                  </span>
+                </h3>
+                <p className="text-xs text-[#929292] mt-0.5">
+                  Select your creation workflow to begin crafting your video.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setNewProjectModalOpen(false)}
+                className="text-[#929292] hover:text-[#F5F5F0] text-sm p-1"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              {/* Option 1: Edit my footage */}
+              <div
+                onClick={() => {
+                  setView("studio");
+                  setNewProjectModalOpen(false);
+                }}
+                className="group relative flex flex-col justify-between rounded-xl border border-[#292929] bg-[#080808]/60 p-4 cursor-pointer hover:border-[#FFC800]/70 hover:bg-[#FFC800]/5 transition-all shadow-sm"
+              >
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xl">🎬</span>
+                    <span className="text-[10px] font-mono uppercase bg-[#292929] px-2 py-0.5 rounded text-[#929292] group-hover:text-[#FFC800]">
+                      Footage Editor
+                    </span>
+                  </div>
+                  <h4 className="text-sm font-semibold text-[#F5F5F0] group-hover:text-[#FFC800] transition-colors">
+                    1. Edit my footage
+                  </h4>
+                  <p className="text-xs text-[#929292] mt-1.5 leading-relaxed">
+                    Import multiple video clips or links, analyze moments, cut with precision, and export publish-ready 9:16 reels.
+                  </p>
+                </div>
+                <div className="mt-4 flex items-center gap-1.5 text-xs text-[#FFC800] font-medium">
+                  <span>Open Studio</span>
+                  <span>→</span>
+                </div>
+              </div>
+
+              {/* Option 2: Generate a video */}
+              <div
+                onClick={() => {
+                  setNewProjectModalOpen(false);
+                  setGenerateModalOpen(true);
+                }}
+                className="group relative flex flex-col justify-between rounded-xl border border-[#292929] bg-[#080808]/60 p-4 cursor-pointer hover:border-[#FFC800]/70 hover:bg-[#FFC800]/5 transition-all shadow-sm"
+              >
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xl">✨</span>
+                    <span className="text-[10px] font-mono uppercase bg-[#FFC800]/15 px-2 py-0.5 rounded text-[#FFC800]">
+                      AI Script to Video
+                    </span>
+                  </div>
+                  <h4 className="text-sm font-semibold text-[#F5F5F0] group-hover:text-[#FFC800] transition-colors">
+                    2. Generate a video
+                  </h4>
+                  <p className="text-xs text-[#929292] mt-1.5 leading-relaxed">
+                    Enter a prompt or script to generate cinematic scenes, voiceover narration, and synchronized background score.
+                  </p>
+                </div>
+                <div className="mt-4 flex items-center gap-1.5 text-xs text-[#FFC800] font-medium">
+                  <span>Create with AI</span>
+                  <span>→</span>
+                </div>
+              </div>
+
+              {/* Option 3: Recreate a reference */}
+              <div
+                onClick={() => {
+                  setView("recreate");
+                  setNewProjectModalOpen(false);
+                }}
+                className="group relative flex flex-col justify-between rounded-xl border border-[#292929] bg-[#080808]/60 p-4 cursor-pointer hover:border-[#FFC800]/70 hover:bg-[#FFC800]/5 transition-all shadow-sm"
+              >
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xl">🎯</span>
+                    <span className="text-[10px] font-mono uppercase bg-[#292929] px-2 py-0.5 rounded text-[#929292] group-hover:text-[#FFC800]">
+                      Style Mimic
+                    </span>
+                  </div>
+                  <h4 className="text-sm font-semibold text-[#F5F5F0] group-hover:text-[#FFC800] transition-colors">
+                    3. Recreate a reference
+                  </h4>
+                  <p className="text-xs text-[#929292] mt-1.5 leading-relaxed">
+                    Paste any Reel or Short link to extract its cut rhythm, pacing DNA, captions, and audio, then apply to your footage.
+                  </p>
+                </div>
+                <div className="mt-4 flex items-center gap-1.5 text-xs text-[#FFC800] font-medium">
+                  <span>Recreate Reel</span>
+                  <span>→</span>
+                </div>
+              </div>
+
+              {/* Option 4: Start from scratch */}
+              <div
+                onClick={() => {
+                  setView("studio");
+                  setNewProjectModalOpen(false);
+                }}
+                className="group relative flex flex-col justify-between rounded-xl border border-[#292929] bg-[#080808]/60 p-4 cursor-pointer hover:border-[#FFC800]/70 hover:bg-[#FFC800]/5 transition-all shadow-sm"
+              >
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xl">⚡</span>
+                    <span className="text-[10px] font-mono uppercase bg-[#292929] px-2 py-0.5 rounded text-[#929292] group-hover:text-[#FFC800]">
+                      Blank Canvas
+                    </span>
+                  </div>
+                  <h4 className="text-sm font-semibold text-[#F5F5F0] group-hover:text-[#FFC800] transition-colors">
+                    4. Start from scratch
+                  </h4>
+                  <p className="text-xs text-[#929292] mt-1.5 leading-relaxed">
+                    Open a clean project workspace to stage footage, mix multi-track audio, and assemble custom compositions.
+                  </p>
+                </div>
+                <div className="mt-4 flex items-center gap-1.5 text-xs text-[#FFC800] font-medium">
+                  <span>Open Blank Studio</span>
+                  <span>→</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* AI Generate Video Modal / Creative Direction */}
+      {generateModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="w-full max-w-lg rounded-2xl border border-[#292929] bg-[#191919] p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-[#292929] pb-3">
+              <div>
+                <h3 className="text-base font-bold text-[#F5F5F0] flex items-center gap-2">
+                  <span>✨ Generate a Video</span>
+                  <span className="text-[10px] font-mono bg-[#FFC800]/15 text-[#FFC800] px-2 py-0.5 rounded">
+                    BETA
+                  </span>
+                </h3>
+                <p className="text-xs text-[#929292]">Turn your concept or script into video scenes</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setGenerateModalOpen(false)}
+                className="text-[#929292] hover:text-[#F5F5F0] text-sm"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <label className="block">
+                <span className="text-xs font-medium text-[#F5F5F0]">Prompt or Video Script</span>
+                <textarea
+                  value={promptText}
+                  onChange={(e) => setPromptText(e.target.value)}
+                  placeholder="e.g. A fast-paced 30-second reel showcasing a morning routine in Tokyo, with warm natural light, ambient city sounds, and lo-fi beats…"
+                  rows={4}
+                  className="mt-1.5 w-full rounded-xl border border-[#292929] bg-[#080808] p-3 text-xs text-[#F5F5F0] placeholder:text-[#929292]/60 focus:border-[#FFC800]/60 focus:outline-none"
+                />
+              </label>
+
+              <div>
+                <span className="text-xs font-medium text-[#F5F5F0]">Visual Style</span>
+                <div className="mt-1.5 grid grid-cols-3 gap-2">
+                  {[
+                    { id: "cinematic-warm", label: "Cinematic Warm" },
+                    { id: "documentary", label: "Clean Docu" },
+                    { id: "modern-minimal", label: "Minimalist" },
+                  ].map((style) => (
+                    <button
+                      key={style.id}
+                      type="button"
+                      onClick={() => setPromptStyle(style.id)}
+                      className={`rounded-lg border px-3 py-2 text-xs text-center transition-all ${
+                        promptStyle === style.id
+                          ? "border-[#FFC800] bg-[#FFC800]/10 text-[#FFC800] font-medium"
+                          : "border-[#292929] bg-[#080808] text-[#929292] hover:border-[#292929]/80"
+                      }`}
+                    >
+                      {style.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-2 flex items-center justify-between border-t border-[#292929]">
+              <span className="text-[11px] text-[#929292]">
+                Generates shotlist &amp; voiceover
+              </span>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setGenerateModalOpen(false)}
+                  className="rounded-full border border-[#292929] px-4 py-1.5 text-xs text-[#929292] hover:text-[#F5F5F0]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setGenerateModalOpen(false);
+                    setView("studio");
+                  }}
+                  className="rounded-full bg-[#FFC800] px-5 py-1.5 text-xs font-semibold text-black hover:bg-[#D99A00]"
+                >
+                  Open in Studio
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <main className="mx-auto max-w-5xl px-6 py-8 space-y-8">
         {error && (
@@ -1216,6 +1473,80 @@ export default function StudioPage() {
               selectedIds={librarySelected}
               onGoLibrary={() => setView("library")}
             />
+          ) : homeView === "templates" ? (
+            <section className="space-y-6">
+              <div className="rounded-2xl border border-[#292929] bg-[#191919] p-6">
+                <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+                  <div>
+                    <h2 className="text-base font-semibold text-[#F5F5F0] flex items-center gap-2">
+                      <span>Curated Pacing Templates</span>
+                      <span className="rounded-full bg-[#FFC800]/15 px-2 py-0.5 text-[10px] font-mono text-[#FFC800]">
+                        PRO PACING
+                      </span>
+                    </h2>
+                    <p className="text-xs text-[#929292] mt-0.5">
+                      Ready-to-use edit blueprints with calibrated scene cut rhythms, beat drops, and vertical reframing.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {[
+                    {
+                      title: "Cinematic Vlog Montage",
+                      tag: "30s · 18 cuts · High Energy",
+                      desc: "Rhythmic rapid cuts on every beat, perfect for travel, lifestyle, and dynamic daily recaps.",
+                      duration: 30,
+                    },
+                    {
+                      title: "Emotional Story Arc",
+                      tag: "45s · 10 cuts · Smooth Pacing",
+                      desc: "Generous pauses and ambient audio blending, designed for narrative vlogs and documentary stories.",
+                      duration: 45,
+                    },
+                    {
+                      title: "Viral 0.8s Hook & Reveal",
+                      tag: "20s · 14 cuts · High Retention",
+                      desc: "Fast-paced micro-cuts in the first 3 seconds to maximize retention, followed by a punchy transition.",
+                      duration: 20,
+                    },
+                    {
+                      title: "Aesthetic B-Roll Flow",
+                      tag: "30s · 12 cuts · Warm Mood",
+                      desc: "Gentle pacing tuned for cinematic B-roll sequences with soft audio ducking and elegant transitions.",
+                      duration: 30,
+                    },
+                  ].map((tpl, i) => (
+                    <div
+                      key={i}
+                      className="group flex flex-col justify-between rounded-xl border border-[#292929] bg-[#080808] p-4 hover:border-[#FFC800]/60 transition-all"
+                    >
+                      <div>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="text-xs font-semibold text-[#F5F5F0] group-hover:text-[#FFC800] transition-colors">
+                            {tpl.title}
+                          </span>
+                          <span className="text-[10px] font-mono text-[#929292] bg-[#191919] px-2 py-0.5 rounded border border-[#292929]">
+                            {tpl.tag}
+                          </span>
+                        </div>
+                        <p className="text-xs text-[#929292] leading-relaxed mt-1">{tpl.desc}</p>
+                      </div>
+                      <div className="mt-4 flex items-center justify-between pt-3 border-t border-[#292929]">
+                        <span className="text-[11px] text-[#929292]">Target: {tpl.duration}s 9:16</span>
+                        <button
+                          type="button"
+                          onClick={() => setView("recreate")}
+                          className="rounded-full bg-[#FFC800] px-3.5 py-1 text-xs font-semibold text-black hover:bg-[#D99A00] transition-colors"
+                        >
+                          Use Template
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </section>
           ) : (
           <>
           <section className="space-y-6">

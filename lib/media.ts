@@ -4,7 +4,14 @@ import path from "path";
 import { promisify } from "util";
 import { resolveFfmpeg, resolveFfprobe } from "./binaries";
 import { thumbsDir } from "./paths";
-import type { ClipRange, CropPosition, ExportFormat, JobMusic, VideoSegment } from "./types";
+import type {
+  ClipRange,
+  CropPosition,
+  ExportFormat,
+  JobMusic,
+  ReelLook,
+  VideoSegment,
+} from "./types";
 
 const execFileAsync = promisify(execFile);
 
@@ -159,24 +166,57 @@ export type RenderOptions = {
   outputFile: string;
   workDir: string;
   videoHasAudio: boolean;
+  height?: number;
+  look?: ReelLook;
+  mute?: boolean;
   music?: JobMusic & { file: string };
+  textOverlays?: Array<{ file: string; start: number; end: number }>;
+  punchIndices?: number[];
+  fadeOut?: boolean;
   onProgress?: (fraction: number) => void;
 };
 
-function buildFilter(format: ExportFormat, crop: CropPosition): string {
+function even(value: number): number {
+  return Math.max(2, Math.round(value / 2) * 2);
+}
+
+function gradeFilter(look: ReelLook | undefined): string {
+  switch (look) {
+    case "warm":
+      return ",eq=brightness=0.018:gamma=1.06:contrast=1.0:saturation=1.06,colorbalance=rs=0.045:gs=0.008:bs=-0.035";
+    case "clean":
+      return ",eq=saturation=0.96:contrast=1.08:brightness=0.012,unsharp=5:5:0.35";
+    case "cinematic":
+      return ",eq=saturation=0.88:contrast=1.13:brightness=-0.008,colorbalance=rs=0.04:bs=-0.055,vignette=PI/5";
+    default:
+      return "";
+  }
+}
+
+function buildFilter(format: ExportFormat, crop: CropPosition, height = 1080, look?: ReelLook): string {
+  const h = even(height);
   const cropX = crop === "left" ? "0" : crop === "right" ? "iw-ow" : "(iw-ow)/2";
+  const vw = even(Math.round((h * 9) / 16));
+  const hw = even(Math.round((h * 16) / 9));
+  const grade = gradeFilter(look);
+  const trimCaptions = (width: number) =>
+    `,crop=iw:trunc(ih*0.9/2)*2:0:0,scale=${width}:${h},setsar=1`;
   switch (format) {
     case "horizontal":
-      // Full-bleed 16:9 (YouTube-style).
-      return `scale=w=1920:h=1080:force_original_aspect_ratio=increase:flags=lanczos,crop=1920:1080:${cropX}:(ih-1080)/2,setsar=1`;
+      return `scale=w=${hw}:h=${h}:force_original_aspect_ratio=increase:flags=lanczos,crop=${hw}:${h}:${cropX}:(ih-${h})/2,setsar=1${trimCaptions(hw)}${grade}`;
     case "fit":
-      // Horizontal content centered inside a vertical canvas (Instagram-style letterbox).
-      return `scale=w=1080:h=1920:force_original_aspect_ratio=decrease:flags=lanczos,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1`;
+      return `scale=w=${vw}:h=${h}:force_original_aspect_ratio=decrease:flags=lanczos,pad=${vw}:${h}:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1${trimCaptions(vw)}${grade}`;
     case "vertical":
     default:
-      // Cropped to fill 9:16.
-      return `scale=w=1080:h=1920:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:1920:${cropX}:(ih-1920)/2,setsar=1`;
+      return `scale=w=${vw}:h=${h}:force_original_aspect_ratio=increase:flags=lanczos,crop=${vw}:${h}:${cropX}:(ih-${h})/2,setsar=1${trimCaptions(vw)}${grade}`;
   }
+}
+
+function outputSize(format: ExportFormat, height = 1080): { width: number; height: number } {
+  const h = even(height);
+  return format === "horizontal"
+    ? { width: even((h * 16) / 9), height: h }
+    : { width: even((h * 9) / 16), height: h };
 }
 
 function runFfmpeg(args: string[]): Promise<void> {
@@ -196,17 +236,28 @@ function runFfmpeg(args: string[]): Promise<void> {
 }
 
 export async function renderReel(opts: RenderOptions): Promise<void> {
-  const { sourceFile, ranges, crop, format, outputFile, workDir, music, videoHasAudio } = opts;
+  const { sourceFile, ranges, crop, format, outputFile, workDir, videoHasAudio, height, mute } = opts;
+  const music = mute ? undefined : opts.music;
   await fs.mkdir(workDir, { recursive: true });
   await fs.mkdir(path.dirname(outputFile), { recursive: true });
 
-  const filterTail = buildFilter(format, crop);
-  const steps = ranges.length + (music ? 2 : 1);
+  const filterTail = buildFilter(format, crop, height, opts.look);
+  const overlays = (opts.textOverlays ?? []).filter((overlay) => overlay.end > overlay.start);
+  const punches = new Set(opts.punchIndices ?? []);
+  const size = outputSize(format, height);
+  const steps = ranges.length + (music ? 2 : 1) + (overlays.length > 0 ? 1 : 0);
 
   const parts: string[] = [];
   for (let i = 0; i < ranges.length; i++) {
     const { start, end } = ranges[i];
     const dur = Math.max(0.1, end - start);
+    let partFilter = filterTail;
+    if (punches.has(i)) {
+      partFilter += `,zoompan=z='if(lt(on,6),1+0.01*on,1.06)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s=${size.width}x${size.height}:fps=30,setsar=1`;
+    }
+    if (opts.fadeOut && i === ranges.length - 1) {
+      partFilter += `,fade=t=out:st=${(dur - 0.35).toFixed(3)}:d=0.35`;
+    }
     const part = path.join(workDir, `part-${String(i).padStart(3, "0")}.mp4`);
     parts.push(part);
     await runFfmpeg([
@@ -218,7 +269,7 @@ export async function renderReel(opts: RenderOptions): Promise<void> {
       "-t",
       dur.toFixed(3),
       "-vf",
-      filterTail,
+      partFilter,
       "-r",
       "30",
       "-c:v",
@@ -229,16 +280,9 @@ export async function renderReel(opts: RenderOptions): Promise<void> {
       "20",
       "-pix_fmt",
       "yuv420p",
-      "-c:a",
-      "aac",
-      "-b:a",
-      "192k",
-      "-ar",
-      "48000",
-      "-ac",
-      "2",
-      "-movflags",
-      "+faststart",
+      ...(mute
+        ? ["-an"]
+        : ["-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2", "-movflags", "+faststart"]),
       part,
     ]);
     opts.onProgress?.((i + 1) / steps);
@@ -250,8 +294,7 @@ export async function renderReel(opts: RenderOptions): Promise<void> {
     parts.map((p) => `file '${p.replace(/'/g, "'\\''")}'`).join("\n"),
     "utf8",
   );
-  // When music is mixed in, concat to a temp file first, then do an audio pass.
-  const concatFile = music ? path.join(workDir, "concat.mp4") : outputFile;
+  let stageFile = music || overlays.length > 0 ? path.join(workDir, "concat.mp4") : outputFile;
   await runFfmpeg([
     "-y",
     "-f",
@@ -264,9 +307,46 @@ export async function renderReel(opts: RenderOptions): Promise<void> {
     "copy",
     "-movflags",
     "+faststart",
-    concatFile,
+    stageFile,
   ]);
   opts.onProgress?.((ranges.length + 1) / steps);
+
+  if (overlays.length > 0) {
+    const textFile = path.join(workDir, "text-pass.mp4");
+    const textArgs = ["-y", "-i", stageFile];
+    for (const overlay of overlays) {
+      textArgs.push("-i", path.join(workDir, overlay.file));
+    }
+    const chains: string[] = [];
+    let last = "0:v";
+    overlays.forEach((overlay, i) => {
+      const label = `tv${i}`;
+      chains.push(
+        `[${last}][${i + 1}:v]overlay=0:0:enable='between(t,${overlay.start.toFixed(3)},${overlay.end.toFixed(3)})'[${label}]`,
+      );
+      last = label;
+    });
+    textArgs.push(
+      "-filter_complex",
+      chains.join(";"),
+      "-map",
+      `[${last}]`,
+      "-c:v",
+      "libx264",
+      "-preset",
+      "veryfast",
+      "-crf",
+      "20",
+      "-pix_fmt",
+      "yuv420p",
+      "-an",
+      textFile,
+    );
+    await runFfmpeg(textArgs);
+    await fs.unlink(stageFile).catch(() => undefined);
+    stageFile = textFile;
+    opts.onProgress?.((ranges.length + 2) / steps);
+  }
 
   if (music) {
     const volume = Math.max(0, Math.min(1, music.volume));
@@ -284,8 +364,14 @@ export async function renderReel(opts: RenderOptions): Promise<void> {
         (music.trim.end - music.trim.start).toFixed(3),
         "-i",
         music.file,
-        "-c",
-        "copy",
+        "-c:a",
+        "aac",
+        "-b:a",
+        "192k",
+        "-ar",
+        "48000",
+        "-ac",
+        "2",
         seg,
       ]);
       musicFile = seg;
@@ -301,7 +387,7 @@ export async function renderReel(opts: RenderOptions): Promise<void> {
     await runFfmpeg([
       "-y",
       "-i",
-      concatFile,
+      stageFile,
       "-stream_loop",
       "-1",
       "-i",
@@ -327,8 +413,11 @@ export async function renderReel(opts: RenderOptions): Promise<void> {
       "+faststart",
       outputFile,
     ]);
-    await fs.unlink(concatFile).catch(() => undefined);
+    await fs.unlink(stageFile).catch(() => undefined);
     if (musicFile !== music.file) await fs.unlink(musicFile).catch(() => undefined);
+  } else if (stageFile !== outputFile) {
+    await fs.copyFile(stageFile, outputFile);
+    await fs.unlink(stageFile).catch(() => undefined);
   }
   opts.onProgress?.(1);
 
@@ -336,6 +425,36 @@ export async function renderReel(opts: RenderOptions): Promise<void> {
     parts.map((p) => fs.unlink(p).catch(() => undefined)),
   );
   await fs.unlink(listFile).catch(() => undefined);
+}
+
+export async function generateStoryboard(
+  videoFile: string,
+  outFile: string,
+  durationSeconds: number,
+): Promise<void> {
+  const ffmpeg = await resolveFfmpeg();
+  if (!ffmpeg) return;
+  const rate = Math.max(0.05, 6 / Math.max(1, durationSeconds));
+  try {
+    await execFileAsync(
+      ffmpeg,
+      [
+        "-y",
+        "-i",
+        videoFile,
+        "-vf",
+        `fps=${rate.toFixed(3)},scale=180:-2,tile=3x2`,
+        "-frames:v",
+        "1",
+        "-q:v",
+        "4",
+        outFile,
+      ],
+      { timeout: 60000, maxBuffer: 16 * 1024 * 1024 },
+    );
+  } catch {
+    /* storyboard is optional */
+  }
 }
 
 export type StitchedInputPart = {

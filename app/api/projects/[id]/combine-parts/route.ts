@@ -2,11 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import path from "path";
 import { promises as fs } from "fs";
 import { loadProject, saveProject } from "@/lib/store";
-import { partsDir, projectDir, sourcePath } from "@/lib/paths";
+import { partsDir, projectDir } from "@/lib/paths";
 import { probeMedia, generateThumbnails, stitchMediaParts, type StitchedInputPart } from "@/lib/media";
 import { downloadFromUrl, normalizeVideoUrl } from "@/lib/ingest";
 import { resolveFfmpeg, resolveYtDlp } from "@/lib/binaries";
-import type { IngestState, ProjectMeta, VideoSegment } from "@/lib/types";
+import type { IngestState } from "@/lib/types";
 
 const THUMB_COUNT = 12;
 
@@ -50,9 +50,7 @@ export async function POST(
       if (!fresh) return;
       fresh.ingest = next;
       await saveProject(fresh);
-    }).catch((err) => {
-      console.error("setIngest write error:", err);
-    });
+    }).catch(() => undefined);
     return ingestQueue;
   };
 

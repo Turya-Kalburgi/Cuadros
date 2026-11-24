@@ -129,6 +129,19 @@ function parseJson<T>(raw: string | null): T | null {
   }
 }
 
+export async function generateJson(prompt: string): Promise<{
+  data: unknown | null;
+  provider: AiProvider;
+}> {
+  const provider = detectAiProvider();
+  if (provider === "none") return { data: null, provider };
+  const raw =
+    provider === "openai"
+      ? await callOpenAI({ prompt, json: true })
+      : await callGemini({ prompt });
+  return { data: parseJson<unknown>(raw), provider };
+}
+
 // ---------------------------------------------------------------------------
 // Stage 2: Reel analysis (creative DNA)
 // ---------------------------------------------------------------------------

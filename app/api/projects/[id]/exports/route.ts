@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
 import path from "path";
 import { loadProject, saveProject } from "@/lib/store";
-import { exportsDir, projectDir } from "@/lib/paths";
+import { exportsDir, findSourceFile, projectDir } from "@/lib/paths";
 import { renderReel } from "@/lib/media";
 import { resolveFfmpeg } from "@/lib/binaries";
 import {
@@ -118,6 +118,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     );
   }
 
+  const source = await findSourceFile(id);
+  if (!source) {
+    return NextResponse.json({ error: "Source file missing on disk." }, { status: 404 });
+  }
+
   const jobId = randomUUID();
   const now = new Date().toISOString();
   const job: ExportJob = {
@@ -135,7 +140,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   project.exports.unshift(job);
   await saveProject(project);
 
-  const sourceFile = path.join(projectDir(id), `source.${guessExt(project.originalName)}`);
   const outputFile = path.join(exportsDir(id), `reel-${jobId.slice(0, 8)}.mp4`);
 
   // Run the render in the background; the client polls the project endpoint.
@@ -151,7 +155,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     try {
       await update({ status: "rendering" });
       await renderReel({
-        sourceFile,
+        sourceFile: source.file,
         ranges,
         crop,
         format,
@@ -170,9 +174,4 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   })();
 
   return NextResponse.json({ job }, { status: 202 });
-}
-
-function guessExt(name: string): string {
-  const ext = path.extname(name).slice(1).toLowerCase();
-  return ext || "mp4";
 }

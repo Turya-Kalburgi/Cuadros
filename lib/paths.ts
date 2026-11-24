@@ -26,7 +26,10 @@ function resolveStorageRoot(): string {
   return path.join(process.cwd(), "storage");
 }
 
-export const STORAGE_ROOT = resolveStorageRoot();
+const RESOLVED_STORAGE_ROOT = resolveStorageRoot();
+
+export const STORAGE_ROOT = RESOLVED_STORAGE_ROOT;
+export const PROJECT_ROOT = path.dirname(RESOLVED_STORAGE_ROOT);
 
 export function projectDir(id: string): string {
   return path.join(STORAGE_ROOT, "projects", id);
@@ -34,6 +37,20 @@ export function projectDir(id: string): string {
 
 export function sourcePath(id: string, ext: string): string {
   return path.join(projectDir(id), `source.${ext}`);
+}
+
+export async function findSourceFile(id: string): Promise<{ file: string; ext: string } | null> {
+  try {
+    const entries = await fs.readdir(projectDir(id));
+    const name = entries.find((e) => e.startsWith("source.") && !e.endsWith(".uploading"));
+    if (!name) return null;
+    return {
+      file: path.join(projectDir(id), name),
+      ext: name.split(".").pop()?.toLowerCase() ?? "mp4",
+    };
+  } catch {
+    return null;
+  }
 }
 
 export function thumbsDir(id: string): string {
@@ -94,8 +111,56 @@ export function recreateDir(id: string): string {
   return path.join(STORAGE_ROOT, "recreate", id);
 }
 
+export function recreateRoot(): string {
+  return path.join(STORAGE_ROOT, "recreate");
+}
+
 export function recreateMetaPath(id: string): string {
   return path.join(recreateDir(id), "meta.json");
+}
+
+export function autoRoot(): string {
+  return path.join(STORAGE_ROOT, "autoclips");
+}
+
+export function autoDir(id: string): string {
+  return path.join(autoRoot(), id);
+}
+
+export function autoMetaPath(id: string): string {
+  return path.join(autoDir(id), "meta.json");
+}
+
+export function autoClipPath(id: string, fileName: string): string {
+  return path.join(autoDir(id), fileName);
+}
+
+export function generateRoot(): string {
+  return path.join(STORAGE_ROOT, "generated");
+}
+
+export function generateDir(id: string): string {
+  return path.join(generateRoot(), id);
+}
+
+export function generateMetaPath(id: string): string {
+  return path.join(generateDir(id), "meta.json");
+}
+
+export function generateVideoPath(id: string): string {
+  return path.join(generateDir(id), "video.mp4");
+}
+
+export function inspiredDir(id: string): string {
+  return path.join(STORAGE_ROOT, "inspired", id);
+}
+
+export function inspiredMetaPath(id: string): string {
+  return path.join(inspiredDir(id), "meta.json");
+}
+
+export function inspiredVideoPath(id: string): string {
+  return path.join(inspiredDir(id), "reel.mp4");
 }
 
 export async function ensureLibraryDirs(): Promise<void> {

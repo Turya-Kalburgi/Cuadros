@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import path from "path";
-import { readJson } from "@/lib/paths";
+import { readJson, inspiredMetaPath } from "@/lib/paths";
 import type { InspiredJobMeta } from "../route";
 
 export async function GET(
@@ -12,8 +11,7 @@ export async function GET(
     return NextResponse.json({ error: "Invalid id" }, { status: 400 });
   }
 
-  const metaPath = path.join(process.cwd(), "storage", "inspired", id, "meta.json");
-  const meta = await readJson<InspiredJobMeta>(metaPath);
+  const meta = await readJson<InspiredJobMeta>(inspiredMetaPath(id));
   if (!meta) {
     return NextResponse.json({ error: "Job not found" }, { status: 404 });
   }

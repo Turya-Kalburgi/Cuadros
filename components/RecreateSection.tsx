@@ -40,6 +40,7 @@ export default function RecreateSection({ clips, selectedIds, onGoLibrary }: Pro
   const [refUrl, setRefUrl] = useState("");
   const [targetDuration, setTargetDuration] = useState(30);
   const [includeCaptions, setIncludeCaptions] = useState(true);
+  const [rightsConfirmed, setRightsConfirmed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [job, setJob] = useState<RecreateJobMeta | null>(null);
@@ -112,6 +113,10 @@ export default function RecreateSection({ clips, selectedIds, onGoLibrary }: Pro
       setError("Add clips to your library first — the AI needs your footage.");
       return;
     }
+    if (!rightsConfirmed) {
+      setError("Confirm that you have the rights to use this reel and its audio before recreating it.");
+      return;
+    }
     setSubmitting(true);
     try {
       const res = await fetch("/api/recreate", {
@@ -143,6 +148,7 @@ export default function RecreateSection({ clips, selectedIds, onGoLibrary }: Pro
     setJob(null);
     setError(null);
     setRefUrl("");
+    setRightsConfirmed(false);
   };
 
   const openHistoryJob = (j: RecreateJobMeta) => {
@@ -221,7 +227,7 @@ export default function RecreateSection({ clips, selectedIds, onGoLibrary }: Pro
               <span className="font-medium text-zinc-300">Captions</span>
               <span className="mt-0.5 block text-zinc-500">
                 {includeCaptions
-                  ? "Burned into the video + downloadable SRT file."
+                  ? "Burned into the video when supported + downloadable SRT file."
                   : "No captions burned in — clean video only."}
               </span>
             </span>
@@ -269,6 +275,19 @@ export default function RecreateSection({ clips, selectedIds, onGoLibrary }: Pro
             </button>
           </div>
 
+          <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-zinc-800 bg-zinc-950/50 px-4 py-3 text-xs text-zinc-400">
+            <input
+              type="checkbox"
+              checked={rightsConfirmed}
+              onChange={(e) => setRightsConfirmed(e.target.checked)}
+              className="mt-0.5 h-4 w-4 shrink-0 accent-amber-500"
+            />
+            <span>
+              I have the rights to use this reference reel, including its audio, and to create edits
+              from it.
+            </span>
+          </label>
+
           {(error || jobError) && (
             <div className="rounded-lg border border-red-900/60 bg-red-950/40 px-4 py-3 text-sm text-red-300">
               {error ?? jobError}
@@ -287,7 +306,7 @@ export default function RecreateSection({ clips, selectedIds, onGoLibrary }: Pro
           <button
             type="button"
             onClick={() => void start()}
-            disabled={submitting || clips.length === 0}
+            disabled={submitting || clips.length === 0 || !rightsConfirmed}
             className="w-full sm:w-auto rounded-full bg-amber-500 px-8 py-3 text-sm font-semibold text-black hover:bg-amber-400 disabled:opacity-50 disabled:cursor-not-allowed shadow-md transition-all"
           >
             {submitting ? "Starting…" : "🎬 AI Recreate This Reel"}
@@ -462,6 +481,13 @@ export default function RecreateSection({ clips, selectedIds, onGoLibrary }: Pro
           />
         </div>
 
+        {readyJob.includeCaptions !== false && readyJob.result?.captionsBurned === false && (
+          <div className="rounded-lg border border-amber-900/60 bg-amber-950/30 px-4 py-3 text-xs text-amber-200">
+            {readyJob.result.captionWarning ??
+              "Captions were saved as an SRT sidecar but could not be burned into the video."}
+          </div>
+        )}
+
         {analysis && (
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="rounded-xl border border-zinc-800 bg-zinc-950/50 p-4">
@@ -489,14 +515,12 @@ export default function RecreateSection({ clips, selectedIds, onGoLibrary }: Pro
             {(plan?.aiUsed ?? false) ? "AI-authored plan" : "Heuristic plan (set an AI key for smarter picks)"}
           </span>
           <span>·</span>
-          <span
-            className={`rounded-full px-2 py-0.5 ${
-              readyJob.includeCaptions !== false
-                ? "bg-zinc-800 text-zinc-400"
-                : "bg-zinc-800 text-zinc-500"
-            }`}
-          >
-            {readyJob.includeCaptions !== false ? "captions on" : "captions off"}
+          <span className="rounded-full bg-zinc-800 px-2 py-0.5 text-zinc-400">
+            {readyJob.includeCaptions === false
+              ? "captions off"
+              : readyJob.result?.captionsBurned === false
+                ? "captions on (SRT only)"
+                : "captions on"}
           </span>
           <span>·</span>
           <span>trending audio preserved from the reference reel</span>

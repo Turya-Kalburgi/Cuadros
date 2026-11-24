@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createReadStream, promises as fs } from "fs";
-import path from "path";
 import { Readable } from "stream";
 import { loadProject } from "@/lib/store";
-import { projectDir } from "@/lib/paths";
+import { findSourceFile } from "@/lib/paths";
 
 const CONTENT_TYPES: Record<string, string> = {
   mp4: "video/mp4",
@@ -13,24 +12,13 @@ const CONTENT_TYPES: Record<string, string> = {
   mkv: "video/x-matroska",
 };
 
-async function findSource(id: string): Promise<{ file: string; ext: string } | null> {
-  try {
-    const entries = await fs.readdir(projectDir(id));
-    const name = entries.find((e) => e.startsWith("source.") && !e.endsWith(".uploading"));
-    if (!name) return null;
-    return { file: path.join(projectDir(id), name), ext: name.split(".").pop()?.toLowerCase() ?? "mp4" };
-  } catch {
-    return null;
-  }
-}
-
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const project = await loadProject(id);
   if (!project || project.ingest?.status === "downloading" || project.ingest?.status === "processing") {
     return NextResponse.json({ error: "Project not found." }, { status: 404 });
   }
-  const source = await findSource(id);
+  const source = await findSourceFile(id);
   if (!source) {
     return NextResponse.json({ error: "Source file missing on disk." }, { status: 404 });
   }

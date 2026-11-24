@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import LibrarySection from "@/components/LibrarySection";
 import RecreateSection from "@/components/RecreateSection";
+import GenerateSection from "@/components/GenerateSection";
+import AutoClipsSection from "@/components/AutoClipsSection";
 import type {
   ClipRange,
   CropPosition,
@@ -49,12 +51,18 @@ function isVideoFileName(name: string): boolean {
   return /\.(mp4|mov|m4v|webm|mkv)$/i.test(name);
 }
 
+const MAX_LINKS = 8;
+
 function parseTime(input: string): number | null {
   const trimmed = input.trim();
   if (!trimmed) return null;
   if (/^\d+(\.\d+)?$/.test(trimmed)) return parseFloat(trimmed);
   const m = trimmed.match(/^(\d+):(\d+(?:\.\d+)?)$/);
-  if (m) return parseInt(m[1], 10) * 60 + parseFloat(m[2]);
+  if (m) {
+    const seconds = parseFloat(m[2]);
+    if (seconds < 60) return parseInt(m[1], 10) * 60 + seconds;
+    return null;
+  }
   return null;
 }
 
@@ -170,6 +178,7 @@ export default function StudioPage() {
   const [importMode, setImportMode] = useState<"combine" | "separate">("combine");
   const [activeMediaTab, setActiveMediaTab] = useState<"clips" | "links">("clips");
   const [linkInputText, setLinkInputText] = useState("");
+  const [linkRightsConfirmed, setLinkRightsConfirmed] = useState(false);
   const [importProgressText, setImportProgressText] = useState<string | null>(null);
   const [importOverallPct, setImportOverallPct] = useState(0);
   const [musicUrl, setMusicUrl] = useState("");
@@ -189,7 +198,7 @@ export default function StudioPage() {
   const [bulkMore, setBulkMore] = useState(0);
   const [playhead, setPlayhead] = useState(0);
   const [sel, setSel] = useState<{ start: number; end: number } | null>(null);
-  const [homeView, setHomeView] = useState<"studio" | "library" | "recreate" | "templates">("studio");
+  const [homeView, setHomeView] = useState<"studio" | "library" | "recreate" | "generate" | "autoclips" | "templates">("studio");
   const [newProjectModalOpen, setNewProjectModalOpen] = useState(false);
   const [generateModalOpen, setGenerateModalOpen] = useState(false);
   const [promptText, setPromptText] = useState("");
@@ -225,14 +234,14 @@ export default function StudioPage() {
     Promise.resolve().then(() => {
       try {
         const saved = sessionStorage.getItem("cuadros:view") || sessionStorage.getItem("fm:view");
-        if (saved === "library" || saved === "recreate" || saved === "templates") setHomeView(saved);
+        if (saved === "library" || saved === "recreate" || saved === "generate" || saved === "autoclips" || saved === "templates") setHomeView(saved);
       } catch {
         /* storage unavailable */
       }
     });
   }, []);
 
-  const setView = (v: "studio" | "library" | "recreate" | "templates") => {
+  const setView = (v: "studio" | "library" | "recreate" | "generate" | "autoclips" | "templates") => {
     setHomeView(v);
     try {
       sessionStorage.setItem("cuadros:view", v);
@@ -475,7 +484,6 @@ export default function StudioPage() {
       setError("Paste a video link (https://…) — or several separated by spaces.");
       return;
     }
-    const MAX_LINKS = 8;
     const queue = tokens.slice(0, MAX_LINKS);
     setImporting(true);
     setSelectedExport(null);
@@ -702,12 +710,21 @@ export default function StudioPage() {
   };
 
   const startImportStaged = async () => {
-    const selected = stagedItems.filter((i) => i.selected);
-    if (selected.length === 0) {
+    const allSelected = stagedItems.filter((i) => i.selected);
+    if (allSelected.length === 0) {
       setError("Please select at least one clip or link to import.");
       return;
     }
-    setError(null);
+    if (allSelected.some((i) => i.type === "link") && !linkRightsConfirmed) {
+      setError("Confirm that you have the rights to use the video links you are importing.");
+      return;
+    }
+    const selected = allSelected.slice(0, MAX_LINKS);
+    setError(
+      selected.length < allSelected.length
+        ? `Importing the first ${MAX_LINKS} of ${allSelected.length} selected items.`
+        : null,
+    );
     setImporting(true);
     setSelectedExport(null);
     setRanges([]);
@@ -1170,9 +1187,11 @@ export default function StudioPage() {
         {!project && (
           <nav className="flex rounded-full border border-[#292929] p-0.5 bg-[#191919]">
             {(
-              [
-                { key: "studio", label: "🎬 Studio" },
-                { key: "recreate", label: "✨ Recreate" },
+                [
+                  { key: "autoclips", label: "🧠 Auto Clips" },
+                  { key: "studio", label: "🎬 Studio" },
+                  { key: "recreate", label: "✨ Recreate" },
+                { key: "generate", label: "⚡ Generate" },
                 { key: "library", label: `🎞️ Library${libraryClips.length > 0 ? ` (${libraryClips.length})` : ""}` },
                 { key: "templates", label: "⚡ Templates" },
               ] as const
@@ -1421,7 +1440,7 @@ export default function StudioPage() {
 
             <div className="pt-2 flex items-center justify-between border-t border-[#292929]">
               <span className="text-[11px] text-[#929292]">
-                Generates shotlist &amp; voiceover
+                Builds a shotlist, scenes, captions &amp; optional narration
               </span>
               <div className="flex gap-2">
                 <button
@@ -1435,11 +1454,11 @@ export default function StudioPage() {
                   type="button"
                   onClick={() => {
                     setGenerateModalOpen(false);
-                    setView("studio");
+                    setView("generate");
                   }}
                   className="rounded-full bg-[#FFC800] px-5 py-1.5 text-xs font-semibold text-black hover:bg-[#D99A00]"
                 >
-                  Open in Studio
+                  Open Generator
                 </button>
               </div>
             </div>
@@ -1456,7 +1475,9 @@ export default function StudioPage() {
 
         {!project ? (
           <>
-          {homeView === "library" ? (
+          {homeView === "autoclips" ? (
+            <AutoClipsSection />
+          ) : homeView === "library" ? (
             <LibrarySection
               clips={libraryClips}
               selectedIds={librarySelected}
@@ -1473,6 +1494,8 @@ export default function StudioPage() {
               selectedIds={librarySelected}
               onGoLibrary={() => setView("library")}
             />
+          ) : homeView === "generate" ? (
+            <GenerateSection initialPrompt={promptText} initialStyle={promptStyle} />
           ) : homeView === "templates" ? (
             <section className="space-y-6">
               <div className="rounded-2xl border border-[#292929] bg-[#191919] p-6">
@@ -1629,6 +1652,15 @@ export default function StudioPage() {
                   <p className="text-xs text-zinc-500">
                     Paste YouTube, Shorts, or other video URLs. You can paste several links separated by spaces or new lines!
                   </p>
+                  <label className="flex cursor-pointer items-start gap-2 text-xs text-zinc-400">
+                    <input
+                      type="checkbox"
+                      checked={linkRightsConfirmed}
+                      onChange={(e) => setLinkRightsConfirmed(e.target.checked)}
+                      className="mt-0.5 h-4 w-4 shrink-0 accent-amber-500"
+                    />
+                    <span>I have the rights to use these videos and their audio.</span>
+                  </label>
                   <div className="mt-2 flex gap-2">
                     <input
                       type="text"

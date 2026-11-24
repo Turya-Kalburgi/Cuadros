@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { promises as fs } from "fs";
+import { createWriteStream, promises as fs } from "fs";
 import path from "path";
 import { randomUUID } from "crypto";
+import { Readable } from "stream";
+import { pipeline } from "stream/promises";
 import { generateInspiredReel, type InspiredReelResult } from "@/lib/inspired";
-import { downloadFromUrl, normalizeVideoUrl } from "@/lib/ingest";
+import { downloadVideoToDir, normalizeVideoUrl } from "@/lib/ingest";
 import { resolveFfmpeg, resolveYtDlp } from "@/lib/binaries";
-import { writeJson, readJson } from "@/lib/paths";
+import { inspiredDir, writeJson, readJson } from "@/lib/paths";
 
 export const maxDuration = 300; // Allow up to 5 minutes execution
 
@@ -57,7 +59,7 @@ export async function POST(request: NextRequest) {
   }
 
   const id = randomUUID();
-  const jobDir = path.join(process.cwd(), "storage", "inspired", id);
+  const jobDir = inspiredDir(id);
   await fs.mkdir(jobDir, { recursive: true });
 
   const metaPath = path.join(jobDir, "meta.json");
@@ -86,9 +88,11 @@ export async function POST(request: NextRequest) {
 
       // 1. Download inspiration video
       await updateJob({ progress: 10, detail: "Downloading inspiration video & song track…" });
-      const { filePath: inspiredVideoPath, title: inspiredTitle } = await downloadFromUrl(
+      const { filePath: inspiredVideoPath, title: inspiredTitle } = await downloadVideoToDir(
         inspiredUrl,
-        `inspired-${id}`,
+        jobDir,
+        undefined,
+        "inspired",
       );
 
       // 2. Save user uploaded files to jobDir
@@ -97,8 +101,7 @@ export async function POST(request: NextRequest) {
         const file = files[i];
         const ext = path.extname(file.name).slice(1) || "mp4";
         const userFilePath = path.join(jobDir, `user-clip-${i}.${ext}`);
-        const buffer = Buffer.from(await file.arrayBuffer());
-        await fs.writeFile(userFilePath, buffer);
+        await pipeline(Readable.fromWeb(file.stream() as never), createWriteStream(userFilePath));
         userClips.push({ filePath: userFilePath, name: file.name });
       }
 
@@ -109,7 +112,7 @@ export async function POST(request: NextRequest) {
           progress: 20 + Math.round((i / userLinks.length) * 15),
           detail: `Downloading your video footage link ${i + 1}…`,
         });
-        const { filePath, title } = await downloadFromUrl(link, `user-link-${id}-${i}`);
+        const { filePath, title } = await downloadVideoToDir(link, jobDir, undefined, `user-link-${i}`);
         userClips.push({ filePath, name: title || `Footage Link ${i + 1}` });
       }
 

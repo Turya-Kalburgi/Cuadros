@@ -1,0 +1,41 @@
+{
+  "source": "Analyzed directly from downloaded Instagram reels + public reel examples reported in 2026 research",
+  "analyzed": [
+    {
+      "id": "DVBb3AajHUq",
+      "url": "https://www.instagram.com/reel/DVBb3AajHUq/",
+      "creator": "turyakalburgi",
+      "caption": "Pull-ups😮‍💨 #fyp #explore",
+      "durationSeconds": 20.41,
+      "hardCuts": 0,
+      "shotLengths": [20.41],
+      "bpm": 112.3,
+      "brightness": 126.2,
+      "saturation": 62.9,
+      "text": "minimal (two small lines)",
+      "look": "soft window light, neutral wall, single locked composition",
+      "lesson": "A good-looking reel here is one calm continuous action with a song — not random fast cuts."
+    }
+  ],
+  "examples": [
+    { "hook": "when you've moved 7 times in the last 4 years so you're basically a professional", "type": "relatable", "views": 27000000, "song": null, "source": "Aubrium 600-reel apartment-living study" },
+    { "hook": "POV: You just rented the smallest apartment in NYC", "type": "POV", "views": 1700000, "song": null, "source": "Aubrium" },
+    { "hook": "\"decorating on a budget is impossible\"", "type": "bold claim", "views": 3700000, "song": null, "source": "Aubrium" },
+    { "hook": "What is it like to live alone in a 5-square-meter room at 42?", "type": "question", "views": 1800000, "song": null, "source": "Aubrium" },
+    { "hook": "The day we bought our apartment vs.", "type": "transformation tease", "views": 4200000, "song": null, "source": "Aubrium" },
+    { "hook": "asmr 6am morning routine alone in nyc. oil pulling, vibration plate, rooftop meditation...", "type": "ASMR routine", "views": null, "song": null, "source": "Instagram @itspaulinacee" },
+    { "hook": "affirmation / mantra zoom", "type": "text-led", "views": null, "song": "DROP IT LIKE ITS HOT x STAYIN ALIVE (ALTÉGO MIX)", "source": "Buffer Nov 2026" },
+    { "hook": "before-and-after outfit reveal", "type": "transformation", "views": null, "song": "Upside Down — Diana Ross", "source": "Buffer Nov 2026" }
+  ],
+  "rules": {
+    "cleanShotDurationSeconds": 20,
+    "preferredBpm": [100, 120],
+    "brightnessRange": [110, 150],
+    "saturationRange": [50, 80],
+    "text": "minimal — one small hook line, no dense captions",
+    "cuts": "continuous or 1-2 motivated cuts; hard cuts only",
+    "preferKinds": ["wide", "active", "detail"],
+    "avoidCloseFace": true,
+    "defaultStyle": "clean"
+  }
+}

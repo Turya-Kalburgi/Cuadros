@@ -56,7 +56,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       });
 
       await setMusic({ status: "processing" }, ["downloading"]);
-      const durationSeconds = await probeAudioDuration(filePath);      const fresh = await loadProject(id);
+      const durationSeconds = await probeAudioDuration(filePath);
+      const fresh = await loadProject(id);
       if (!fresh?.music) return;
       fresh.music = {
         status: "ready",

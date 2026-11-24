@@ -1,8 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
+import { promises as fs } from "fs";
+import path from "path";
 import { normalizeVideoUrl } from "@/lib/ingest";
 import { resolveFfmpeg, resolveYtDlp } from "@/lib/binaries";
-import { ensureRecreateDirs, readJson, recreateMetaPath, writeJson } from "@/lib/paths";
+import {
+  ensureRecreateDirs,
+  readJson,
+  recreateMetaPath,
+  recreateRoot,
+  writeJson,
+} from "@/lib/paths";
 import { getClipsByIds, libraryClipFilePath, listLibraryClips } from "@/lib/library";
 import { runRecreateJob } from "@/lib/recreate";
 import type { RecreateJobMeta } from "@/lib/types";
@@ -125,10 +133,7 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET() {
-  // List recent recreate jobs (for the UI history)
-  const { promises: fs } = await import("fs");
-  const pathMod = await import("path");
-  const root = pathMod.join(process.cwd(), "storage", "recreate");
+  const root = recreateRoot();
   let entries: string[] = [];
   try {
     entries = await fs.readdir(root);
@@ -137,9 +142,7 @@ export async function GET() {
   }
   const jobs: RecreateJobMeta[] = [];
   for (const entry of entries) {
-    const meta = await readJson<RecreateJobMeta>(
-      pathMod.join(root, entry, "meta.json"),
-    );
+    const meta = await readJson<RecreateJobMeta>(path.join(root, entry, "meta.json"));
     if (meta) jobs.push(meta);
   }
   jobs.sort((a, b) => b.createdAt.localeCompare(a.createdAt));

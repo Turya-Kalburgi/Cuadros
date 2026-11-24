@@ -3,6 +3,7 @@ import { promises as fs } from "fs";
 import path from "path";
 import { promisify } from "util";
 import { resolveFfmpeg } from "./binaries";
+import { PROJECT_ROOT } from "./paths";
 import type { EditPlan } from "./types";
 
 const execFileAsync = promisify(execFile);
@@ -107,7 +108,7 @@ export async function renderCaptionPngs(plan: EditPlan, workDir: string): Promis
   };
   const specPath = path.join(workDir, "captions-spec.json");
   await fs.writeFile(specPath, JSON.stringify(spec), "utf8");
-  const script = path.join(process.cwd(), "lib", "render_captions.py");
+  const script = path.join(PROJECT_ROOT, "lib", "render_captions.py");
   await execFileAsync("python3", [script, specPath], { timeout: 30000 });
   return items;
 }

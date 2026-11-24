@@ -405,6 +405,8 @@ export async function renderRecreatedReel(input: RecreateRenderInput): Promise<{
   durationSeconds: number;
   shotsCount: number;
   clipsUsed: string[];
+  captionsBurned: boolean;
+  captionWarning: string | null;
 }> {
   const { plan, clipPaths, audioPath, workDir, outputFile } = input;
   await fs.mkdir(workDir, { recursive: true });
@@ -416,6 +418,8 @@ export async function renderRecreatedReel(input: RecreateRenderInput): Promise<{
     : ["-c:v", "libx264", "-preset", "veryfast", "-crf", "20"];
 
   // 1. Normalize each shot to 1080x1920 silent video
+  const fallbackClipIds = Array.from(clipPaths.keys());
+  const clipDurations = new Map<string, number>();
   const shotFiles: string[] = [];
   const clipsUsed = new Set<string>();
   for (let i = 0; i < plan.shots.length; i++) {
@@ -426,8 +430,14 @@ export async function renderRecreatedReel(input: RecreateRenderInput): Promise<{
       30 + Math.round(((i + 1) / plan.shots.length) * 40),
     );
 
-    if (!shot.clip) {
-      // No clip assigned — solid color placeholder so the reel still completes
+    const requestedId = shot.clip?.libraryClipId;
+    let clipId = requestedId && clipPaths.has(requestedId) ? requestedId : undefined;
+    if (!clipId && fallbackClipIds.length > 0) {
+      clipId = fallbackClipIds[i % fallbackClipIds.length];
+    }
+    const clipPath = clipId ? clipPaths.get(clipId) : undefined;
+
+    if (!clipId || !clipPath) {
       await runFfmpeg([
         "-y",
         "-f",
@@ -448,27 +458,32 @@ export async function renderRecreatedReel(input: RecreateRenderInput): Promise<{
       continue;
     }
 
-    const clipPath = clipPaths.get(shot.clip.libraryClipId);
-    if (!clipPath) {
-      shotFiles.push(out);
-      continue;
+    let clipDuration = clipDurations.get(clipId);
+    if (clipDuration === undefined) {
+      try {
+        clipDuration = (await probeMedia(clipPath)).durationSeconds;
+      } catch {
+        clipDuration = 0;
+      }
+      clipDurations.set(clipId, clipDuration);
     }
-    clipsUsed.add(shot.clip.clipName);
+    clipsUsed.add(shot.clip?.clipName ?? path.basename(clipPath));
 
-    const ss = shot.clip.sourceStart.toFixed(3);
-    const avail = Math.max(0.3, shot.clip.sourceEnd - shot.clip.sourceStart);
     const want = Math.max(0.3, shot.durationSeconds);
-    // Slow-down stretch: when the source window is shorter than the shot
-    // (short library clip), stretch PTS so it fills the shot duration.
-    const stretch = Math.min(2, Math.max(1, want / avail));
-    // `-t` limits OUTPUT time (post-filter), so it must be the desired output
-    // duration: stretched = avail*factor, normal = the window length.
-    const outDur = avail > want ? want : avail * stretch;
+    const ss = Math.max(0, Math.min(shot.clip?.sourceStart ?? 0, Math.max(0, clipDuration - 0.3)));
+    const rawAvail = shot.clip ? shot.clip.sourceEnd - shot.clip.sourceStart : clipDuration || want;
+    const avail = Math.max(
+      0.3,
+      clipDuration > 0 ? Math.min(rawAvail, Math.max(0.3, clipDuration - ss)) : rawAvail,
+    );
+    const stretch = Math.min(3, Math.max(1, want / avail));
+    const pad = Math.max(0, want - avail * stretch);
     const filterChain = [
       "scale=1080:1920:force_original_aspect_ratio=increase:flags=lanczos",
       "crop=1080:1920:(in_w-1080)/2:(in_h-1920)/2",
       "setsar=1",
       stretch > 1.01 ? `setpts=PTS*${stretch.toFixed(4)}` : null,
+      pad > 0.02 ? `tpad=stop_mode=clone:stop_duration=${pad.toFixed(3)}` : null,
       "fps=30",
     ]
       .filter(Boolean)
@@ -476,11 +491,11 @@ export async function renderRecreatedReel(input: RecreateRenderInput): Promise<{
     await runFfmpeg([
       "-y",
       "-ss",
-      ss,
+      ss.toFixed(3),
       "-i",
       clipPath,
       "-t",
-      outDur.toFixed(3),
+      want.toFixed(3),
       "-vf",
       filterChain,
       "-an",
@@ -517,6 +532,8 @@ export async function renderRecreatedReel(input: RecreateRenderInput): Promise<{
   // 3. Burn captions (if enabled & any): libass when available, Pillow PNG overlay otherwise.
   //    An SRT sidecar is written alongside so captions can be toggled later.
   const hasCaptions = input.includeCaptions !== false && plan.shots.some((s) => s.captionText.trim());
+  let captionsBurned = false;
+  let captionWarning: string | null = null;
   let captionedFile = concatFile;
   if (hasCaptions) {
     input.onProgress?.("Burning in captions…", 82);
@@ -542,7 +559,13 @@ export async function renderRecreatedReel(input: RecreateRenderInput): Promise<{
         burned = true;
       }
     }
-    if (!burned) captionedFile = concatFile;
+    if (burned) {
+      captionsBurned = true;
+    } else {
+      captionedFile = concatFile;
+      captionWarning =
+        "Captions could not be burned into the video because this FFmpeg build has no libass filter and Pillow is unavailable. The SRT sidecar is still available for download.";
+    }
   }
 
   // 4. Mux the reference trending audio
@@ -594,6 +617,8 @@ export async function renderRecreatedReel(input: RecreateRenderInput): Promise<{
     durationSeconds: probe.durationSeconds,
     shotsCount: plan.shots.length,
     clipsUsed: Array.from(clipsUsed),
+    captionsBurned,
+    captionWarning,
   };
 }
 
@@ -633,6 +658,8 @@ export async function runRecreateJob(input: RunRecreateInput): Promise<{
   durationSeconds: number;
   shotsCount: number;
   clipsUsed: string[];
+  captionsBurned: boolean;
+  captionWarning: string | null;
 }> {
   const { jobDir, workDir, targetDuration, clips, clipPaths } = input;
 

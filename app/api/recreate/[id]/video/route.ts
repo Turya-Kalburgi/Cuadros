@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createReadStream, promises as fs } from "fs";
 import path from "path";
 import { Readable } from "stream";
+import { recreateDir } from "@/lib/paths";
 
 export async function GET(
   request: NextRequest,
@@ -12,7 +13,7 @@ export async function GET(
     return NextResponse.json({ error: "Invalid id" }, { status: 400 });
   }
 
-  const videoPath = path.join(process.cwd(), "storage", "recreate", id, "reel.mp4");
+  const videoPath = path.join(recreateDir(id), "reel.mp4");
   try {
     await fs.access(videoPath);
   } catch {
